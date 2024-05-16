@@ -11,6 +11,8 @@ Source2:        fetch_blocked_ips.service
 Source3:        fetch_blocked_ips.timer
 Source4:        sync_blocklist.service
 Source5:        sync_blocklist.timer
+Source6:        honeypot-probe.logrotate
+Source7:        honeypot-client.logrotate
 
 BuildRequires:  gcc
 Requires:       systemd
@@ -20,13 +22,13 @@ Honeypot Blocklist Service to block and sync IPs using firewalld and fail2ban.
 
 %package probe
 Summary:        Honeypot Blocklist Probe
-Requires:       systemd fail2ban
+Requires:       systemd fail2ban logrotate
 %description probe
 Honeypot Blocklist Probe to collect IPs from fail2ban and upload them to GitHub.
 
 %package client
 Summary:        Honeypot Blocklist Client
-Requires:       systemd
+Requires:       systemd logrotate
 %description client
 Honeypot Blocklist Client to sync IPs from GitHub and apply them to firewalld.
 
@@ -44,11 +46,13 @@ g++ -g -o sync_blocklist sync_blocklist.cpp
 install -Dm755 fetch_blocked_ips %{buildroot}/usr/local/bin/fetch_blocked_ips
 install -Dm644 %{SOURCE2} %{buildroot}/etc/systemd/system/fetch_blocked_ips.service
 install -Dm644 %{SOURCE3} %{buildroot}/etc/systemd/system/fetch_blocked_ips.timer
+install -Dm644 %{SOURCE6} %{buildroot}/etc/logrotate.d/honeypot-probe
 
 # Install files for the client package
 install -Dm755 sync_blocklist %{buildroot}/usr/local/bin/sync_blocklist
 install -Dm644 %{SOURCE4} %{buildroot}/etc/systemd/system/sync_blocklist.service
 install -Dm644 %{SOURCE5} %{buildroot}/etc/systemd/system/sync_blocklist.timer
+install -Dm644 %{SOURCE7} %{buildroot}/etc/logrotate.d/honeypot-client
 
 %post probe
 systemctl daemon-reload
@@ -57,8 +61,12 @@ systemctl start fetch_blocked_ips.timer
 
 %preun probe
 if [ $1 -eq 0 ]; then
-    systemctl stop fetch_blocked_ips.timer
-    systemctl disable fetch_blocked_ips.timer
+    if systemctl is-active --quiet fetch_blocked_ips.timer; then
+        systemctl stop fetch_blocked_ips.timer
+    fi
+    if systemctl is-enabled --quiet fetch_blocked_ips.timer; then
+        systemctl disable fetch_blocked_ips.timer
+    fi
 fi
 
 %postun probe
@@ -71,8 +79,12 @@ systemctl start sync_blocklist.timer
 
 %preun client
 if [ $1 -eq 0 ]; then
-    systemctl stop sync_blocklist.timer
-    systemctl disable sync_blocklist.timer
+    if systemctl is-active --quiet sync_blocklist.timer; then
+        systemctl stop sync_blocklist.timer
+    fi
+    if systemctl is-enabled --quiet sync_blocklist.timer; then
+        systemctl disable sync_blocklist.timer
+    fi
 fi
 
 %postun client
@@ -82,16 +94,20 @@ systemctl daemon-reload
 /usr/local/bin/fetch_blocked_ips
 /etc/systemd/system/fetch_blocked_ips.service
 /etc/systemd/system/fetch_blocked_ips.timer
+/etc/logrotate.d/honeypot-probe
 
 %files client
 /usr/local/bin/sync_blocklist
 /etc/systemd/system/sync_blocklist.service
 /etc/systemd/system/sync_blocklist.timer
+/etc/logrotate.d/honeypot-client
 
 %changelog
 * Thu May 16 2024 Sequoia Heights MS <info@sequoiaheightsms.com> - 1.3-1
 - Split into probe and client packages
 - Probe: collects IPs from fail2ban and uploads to GitHub
 - Client: syncs IPs from GitHub and applies to firewalld
+- Probe generates SSH key labeled as id_rsa_probe to be added to be able to contribute to list
+- Added log rotation for probe and client logs
 * Wed May 15 2024 Sequoia Heights MS <info@sequoiaheightsms.com> - 1.0-1
 - Initial package
