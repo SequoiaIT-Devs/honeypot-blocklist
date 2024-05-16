@@ -1,0 +1,9 @@
+%dir /usr/lib/debug
+%dir /usr/lib/debug/usr
+%dir /usr/lib/debug/usr/local
+%dir /usr/lib/debug/usr/local/bin
+%dir /usr/lib/debug/.dwz
+/usr/lib/debug/usr/local/bin/fetch_blocked_ips-1.0-1.el8.x86_64.debug
+/usr/lib/debug/usr/local/bin/update_blocklist-1.0-1.el8.x86_64.debug
+/usr/lib/debug/usr/local/bin/sync_blocklist-1.0-1.el8.x86_64.debug
+/usr/lib/debug/.dwz/honeypot-blocklist-1.0-1.el8.x86_64
