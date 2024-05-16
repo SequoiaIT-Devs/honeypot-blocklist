@@ -6,7 +6,7 @@
 #include <cstdio>
 #include <cstring>
 #include <stdexcept>
-#include <sstream>  // Add this header
+#include <sstream>
 
 // Function to execute a shell command and return the output
 std::string exec(const char* cmd) {
@@ -34,27 +34,48 @@ std::string trim(const std::string& str) {
 }
 
 int main() {
-    std::string jail = "sshd";
-    std::string result = exec(("sudo fail2ban-client status " + jail + " | grep 'Banned IP list:'").c_str());
+    try {
+        std::string jail = "sshd";
+        
+        // Fetch the list of banned IPs from Fail2ban using sed
+        std::string result = exec(("sudo fail2ban-client status " + jail + " | grep 'Banned IP list:' | sed 's/.*Banned IP list:[ ]*//'").c_str());
 
-    size_t pos = result.find("Banned IP list:");
-    if (pos == std::string::npos) {
-        std::cerr << "No banned IPs found.\n";
+        // Debugging: Print the raw output from fail2ban-client status
+        std::cout << "Raw banned IPs output:" << std::endl;
+        std::cout << result << std::endl;
+
+        std::istringstream iss(result);
+        std::string ip;
+
+        std::set<std::string> ip_set;
+        while (iss >> ip) {
+            ip = trim(ip);
+            if (!ip.empty()) {
+                ip_set.insert(ip);
+            }
+        }
+
+        // Loop through each banned IP and block it using firewalld
+        for (const auto& ip : ip_set) {
+            std::string checkCommand = "sudo firewall-cmd --permanent --list-rich-rules | grep -q '" + ip + "'";
+            if (exec(checkCommand.c_str()).empty()) {
+                std::cout << "Blocking IP: " << ip << std::endl;
+                std::string blockCommand = "sudo firewall-cmd --permanent --add-rich-rule='rule family=\"ipv4\" source address=\"" + ip + "\" reject'";
+                exec(blockCommand.c_str());
+            } else {
+                std::cout << "IP already blocked: " << ip << std::endl;
+            }
+        }
+
+        // Reload firewalld to apply changes
+        exec("sudo firewall-cmd --reload");
+        std::cout << "All banned IPs from " << jail << " have been blocked." << std::endl;
+
+    } catch (const std::exception& e) {
+        std::cerr << "Error: " << e.what() << std::endl;
         return 1;
     }
-    std::string ips = result.substr(pos + strlen("Banned IP list:"));
-    std::istringstream iss(ips);  // Correctly initialize the istringstream
-    std::string ip;
 
-    while (iss >> ip) {
-        ip = trim(ip);
-        if (!ip.empty() && exec(("sudo firewall-cmd --permanent --list-rich-rules | grep -q '" + ip + "'").c_str()).empty()) {
-            std::cout << "Blocking IP: " << ip << std::endl;
-            exec(("sudo firewall-cmd --permanent --add-rich-rule='rule family=\"ipv4\" source address=\"" + ip + "\" reject'").c_str());
-        }
-    }
-
-    exec("sudo firewall-cmd --reload");
-    std::cout << "All banned IPs from " << jail << " have been blocked." << std::endl;
     return 0;
 }
+

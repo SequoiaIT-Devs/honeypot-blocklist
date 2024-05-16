@@ -7,7 +7,7 @@
 #include <filesystem>
 #include <stdexcept>
 #include <sstream>
-#include <cstring>  // Add this header
+#include <cstring>
 
 namespace fs = std::filesystem;
 
@@ -63,54 +63,71 @@ std::set<std::string> getIPsFromFirewalld() {
 
 // Function to add an IP to Firewalld
 void addIPToFirewalld(const std::string& ip) {
-    exec(("sudo firewall-cmd --permanent --add-rich-rule='rule family=\"ipv4\" source address=\"" + ip + "\" reject'").c_str());
-    exec("sudo firewall-cmd --reload");
+    std::string checkCommand = "sudo firewall-cmd --permanent --list-rich-rules | grep -q '" + ip + "'";
+    if (!exec(checkCommand.c_str()).empty()) {
+        std::cout << "IP already blocked: " << ip << std::endl;
+    } else {
+        exec(("sudo firewall-cmd --permanent --add-rich-rule='rule family=\"ipv4\" source address=\"" + ip + "\" reject'").c_str());
+        exec("sudo firewall-cmd --reload");
+    }
 }
 
-// Function to add an IP to the local file
+// Function to add an IP to the local file, ensuring no duplicates
 void addIPToFile(const std::string& filename, const std::string& ip) {
-    std::ofstream file;
-    file.open(filename, std::ios::app);
-    if (!file.is_open()) {
-        throw std::runtime_error("Error opening file for writing: " + filename);
+    std::set<std::string> currentIPs = getIPsFromFile(filename);
+    if (currentIPs.find(ip) == currentIPs.end()) {
+        std::ofstream file;
+        file.open(filename, std::ios::app);
+        if (!file.is_open()) {
+            throw std::runtime_error("Error opening file for writing: " + filename);
+        }
+        file << ip << std::endl;
+        file.close();
+        std::cout << "IP added to file: " << ip << std::endl;
+    } else {
+        std::cout << "IP already exists in file: " << ip << std::endl;
     }
-    file << ip << std::endl;
-    file.close();
 }
 
 int main() {
-    const std::string repoPath = "/root/honeypot-blocklist";
-    const std::string filename = repoPath + "/Unauthorized Access Blocklist";
+    try {
+        const std::string repoPath = "/root/honeypot-blocklist";
+        const std::string filename = repoPath + "/Unauthorized Access Blocklist";
 
-    if (!fs::exists(filename)) {
-        std::cerr << "Blocklist file not found." << std::endl;
+        if (!fs::exists(filename)) {
+            std::cerr << "Blocklist file not found." << std::endl;
+            return 1;
+        }
+
+        std::set<std::string> fileIPs = getIPsFromFile(filename);
+        std::set<std::string> firewalldIPs = getIPsFromFirewalld();
+        bool updated = false;
+
+        for (const auto& ip : fileIPs) {
+            if (firewalldIPs.find(ip) == firewalldIPs.end()) {
+                addIPToFirewalld(ip);
+                updated = true;
+            }
+        }
+
+        for (const auto& ip : firewalldIPs) {
+            if (fileIPs.find(ip) == fileIPs.end()) {
+                addIPToFile(filename, ip);
+                updated = true;
+            }
+        }
+
+        if (updated) {
+            std::cout << "Changes detected. Syncing updates..." << std::endl;
+        } else {
+            std::cout << "No changes detected." << std::endl;
+        }
+
+        std::cout << "Synchronization complete." << std::endl;
+    } catch (const std::exception& e) {
+        std::cerr << "Error: " << e.what() << std::endl;
         return 1;
     }
 
-    std::set<std::string> fileIPs = getIPsFromFile(filename);
-    std::set<std::string> firewalldIPs = getIPsFromFirewalld();
-    bool updated = false;
-
-    for (const auto& ip : fileIPs) {
-        if (firewalldIPs.find(ip) == firewalldIPs.end()) {
-            addIPToFirewalld(ip);
-            updated = true;
-        }
-    }
-
-    for (const auto& ip : firewalldIPs) {
-        if (fileIPs.find(ip) == fileIPs.end()) {
-            addIPToFile(filename, ip);
-            updated = true;
-        }
-    }
-
-    if (updated) {
-        std::cout << "Changes detected. Syncing updates..." << std::endl;
-    } else {
-        std::cout << "No changes detected." << std::endl;
-    }
-
-    std::cout << "Synchronization complete." << std::endl;
     return 0;
 }
