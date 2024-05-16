@@ -12,6 +12,14 @@
 
 namespace fs = std::filesystem;
 
+std::ofstream logFile("/var/log/honeypot-probe.log", std::ios::app);
+
+// Function to log messages to both console and log file
+void log(const std::string& message) {
+    std::cout << message << std::endl;
+    logFile << message << std::endl;
+}
+
 // Function to execute a shell command and return the output
 std::string exec(const char* cmd) {
     char buffer[128];
@@ -36,28 +44,27 @@ void generateSSHKeyPair(const std::string& sshKeyPath, const std::string& sshPub
     if (std::system(command.c_str()) != 0) {
         throw std::runtime_error("Error generating SSH key pair");
     }
-    std::cout << "A new SSH key pair has been generated.\n";
-    std::cout << "Please email the public key to robert.romero@sequoiaheightsms.com to be added as a contributor:\n";
+    log("A new SSH key pair has been generated.\nPlease email the public key to robert.romero@sequoiaheightsms.com to be added as a contributor:\n");
     std::ifstream pubkeyFile(sshPublicKeyPath);
     std::string pubkey((std::istreambuf_iterator<char>(pubkeyFile)), std::istreambuf_iterator<char>());
-    std::cout << pubkey << std::endl;
+    log(pubkey);
 }
 
 // Function to set up GitHub repository and SSH configuration using temporary keys
 void setupGitHub() {
     const std::string repoPath = "/root/honeypot-blocklist";
     const std::string tempDir = "/tmp/honeypot-ssh";
-    const std::string sshKeyPath = tempDir + "/id_rsa";
+    const std::string sshKeyPath = tempDir + "/id_rsa_probe";
     const std::string sshPublicKeyPath = sshKeyPath + ".pub";
     const std::string sshConfigPath = tempDir + "/config";
 
     // Create temporary directory
     fs::create_directories(tempDir);
 
-    // Generate SSH key pair
+    // Generate SSH key pair if it doesn't exist
     if (!fs::exists(sshKeyPath) || !fs::exists(sshPublicKeyPath)) {
         generateSSHKeyPair(sshKeyPath, sshPublicKeyPath);
-        std::cout << "Setup is complete. Please add the public key to GitHub and rerun the program." << std::endl;
+        log("Setup is complete. Please add the public key to GitHub and rerun the program.");
         exit(0);
     }
 
@@ -112,7 +119,7 @@ void setupFail2ban() {
 
     // Restart Fail2ban service to apply changes
     exec("systemctl restart fail2ban");
-    std::cout << "Fail2ban has been configured and restarted." << std::endl;
+    log("Fail2ban has been configured and restarted.");
 }
 
 // Function to trim leading and trailing whitespace from a string
@@ -154,8 +161,7 @@ int main() {
         std::string result = exec(("sudo fail2ban-client status " + jail + " | grep 'Banned IP list:' | sed 's/.*Banned IP list:[ ]*//'").c_str());
 
         // Debugging: Print the raw output from fail2ban-client status
-        std::cout << "Raw banned IPs output:" << std::endl;
-        std::cout << result << std::endl;
+        log("Raw banned IPs output:\n" + result);
 
         // Convert the result to a stringstream
         std::istringstream iss(result);
@@ -175,10 +181,10 @@ int main() {
             addIPToBlocklist(blocklistFile, ip);
         }
 
-        std::cout << "All banned IPs from " << jail << " have been added to the blocklist and committed to GitHub." << std::endl;
+        log("All banned IPs from " + jail + " have been added to the blocklist and committed to GitHub.");
 
     } catch (const std::exception& e) {
-        std::cerr << "Error: " << e.what() << std::endl;
+        log("Error: " + std::string(e.what()));
         return 1;
     }
 
