@@ -11,6 +11,14 @@
 
 namespace fs = std::filesystem;
 
+std::ofstream logFile("/var/log/honeypot-client.log", std::ios::app);
+
+// Function to log messages to both console and log file
+void log(const std::string& message) {
+    std::cout << message << std::endl;
+    logFile << message << std::endl;
+}
+
 // Function to execute a shell command and return the output
 std::string exec(const char* cmd) {
     char buffer[128];
@@ -55,8 +63,9 @@ void addIPToFile(const std::string& blocklistFile, const std::string& ip) {
         }
         outputFile << ip << std::endl;
         outputFile.close();
+        log("IP " + ip + " added to blocklist.");
     } else {
-        std::cout << "IP " << ip << " is already in the blocklist." << std::endl;
+        log("IP " + ip + " is already in the blocklist.");
     }
 }
 
@@ -70,6 +79,7 @@ void syncBlocklist() {
     if (std::system(command.c_str()) != 0) {
         throw std::runtime_error("Error syncing GitHub repository");
     }
+    log("GitHub repository synced successfully.");
 
     // Read the blocklist file
     std::ifstream inputFile(blocklistFile);
@@ -84,20 +94,22 @@ void syncBlocklist() {
         if (!ip.empty()) {
             std::string firewallCommand = "firewall-cmd --permanent --add-rich-rule='rule family=\"ipv4\" source address=\"" + ip + "\" reject'";
             exec(firewallCommand.c_str());
+            log("IP " + ip + " added to firewalld.");
         }
     }
     inputFile.close();
 
     // Reload firewalld
     exec("firewall-cmd --reload");
+    log("Firewalld reloaded.");
 }
 
 int main() {
     try {
         syncBlocklist();
-        std::cout << "Blocklist has been synced and applied." << std::endl;
+        log("Blocklist has been synced and applied.");
     } catch (const std::exception& e) {
-        std::cerr << "Error: " << e.what() << std::endl;
+        log("Error: " + std::string(e.what()));
         return 1;
     }
     return 0;
