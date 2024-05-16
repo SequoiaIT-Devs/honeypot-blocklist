@@ -69,7 +69,7 @@ void addIPToFirewalld(const std::string& ip) {
         std::cout << "IP already blocked: " << ip << std::endl;
     } else {
         // Add the IP to Firewalld's blocked list
-        exec(("sudo firewall-cmd --permanent --add-rich-rule='rule family=\"ipv4\" source address=\"" + ip + "\" reject'").c_str());
+        exec(("sudo firewall-cmd --permanent --add-rich-rule='rule family=\"ipv4\" source address=\"" + ip + "\" drop'").c_str());
         // Reload Firewalld to apply changes
         exec("sudo firewall-cmd --reload");
     }
