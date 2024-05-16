@@ -5,7 +5,7 @@
 #include <filesystem>
 #include <stdexcept>
 #include <sstream>
-#include <set>  // Add this header
+#include <set>
 #include <cstring>
 
 namespace fs = std::filesystem;
@@ -82,15 +82,11 @@ int main() {
     temp.close();
     blocklist.close();
 
+    std::ofstream blocklistOut(blocklistFile, std::ios::app); // Open in append mode to avoid deletion
     for (const auto& ip : tempIPs) {
         if (blocklistIPs.find(ip) == blocklistIPs.end()) {
-            blocklistIPs.insert(ip);
+            blocklistOut << ip << std::endl;
         }
-    }
-
-    std::ofstream blocklistOut(blocklistFile);
-    for (const auto& ip : blocklistIPs) {
-        blocklistOut << ip << std::endl;
     }
     blocklistOut.close();
 
@@ -101,3 +97,4 @@ int main() {
     std::cout << "Blocklist update complete." << std::endl;
     return 0;
 }
+
