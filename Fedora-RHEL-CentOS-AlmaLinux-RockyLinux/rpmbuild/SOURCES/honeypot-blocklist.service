@@ -4,8 +4,8 @@ After=network.target
 
 [Service]
 Type=oneshot
-ExecStart=/usr/local/bin/fetch_blocked_ips
-ExecStartPost=/usr/local/bin/sync_blocklist
+ExecStart=/usr/local/bin/sync_blocklist
+ExecStartPost=/usr/local/bin/fetch_blocked_ips
 ExecStartPost=/usr/local/bin/update_blocklist
 
 [Install]

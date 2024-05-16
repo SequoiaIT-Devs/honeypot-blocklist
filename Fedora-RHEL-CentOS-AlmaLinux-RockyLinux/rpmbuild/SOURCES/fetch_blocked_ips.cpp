@@ -26,7 +26,7 @@ std::string exec(const char* cmd) {
     return result;
 }
 
-// Function to trim leading and trailing whitespace
+// Function to trim leading and trailing whitespace from a string
 std::string trim(const std::string& str) {
     size_t start = str.find_first_not_of(" \t\n\r");
     size_t end = str.find_last_not_of(" \t\n\r");
@@ -44,9 +44,11 @@ int main() {
         std::cout << "Raw banned IPs output:" << std::endl;
         std::cout << result << std::endl;
 
+        // Convert the result to a stringstream
         std::istringstream iss(result);
         std::string ip;
-
+        
+        // Use a set to store IPs and avoid duplicates
         std::set<std::string> ip_set;
         while (iss >> ip) {
             ip = trim(ip);
@@ -78,4 +80,5 @@ int main() {
 
     return 0;
 }
+
 
