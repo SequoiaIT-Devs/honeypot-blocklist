@@ -62,7 +62,7 @@ int main() {
             std::string checkCommand = "sudo firewall-cmd --permanent --list-rich-rules | grep -q '" + ip + "'";
             if (exec(checkCommand.c_str()).empty()) {
                 std::cout << "Blocking IP: " << ip << std::endl;
-                std::string blockCommand = "sudo firewall-cmd --permanent --add-rich-rule='rule family=\"ipv4\" source address=\"" + ip + "\" reject'";
+                std::string blockCommand = "sudo firewall-cmd --permanent --add-rich-rule='rule family=\"ipv4\" source address=\"" + ip + "\" drop'";
                 exec(blockCommand.c_str());
             } else {
                 std::cout << "IP already blocked: " << ip << std::endl;
