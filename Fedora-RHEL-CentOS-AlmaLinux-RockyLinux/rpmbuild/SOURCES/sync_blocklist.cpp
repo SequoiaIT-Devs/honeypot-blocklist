@@ -36,7 +36,7 @@ std::set<std::string> getIPsFromFile(const std::string& filename) {
     if (!file.is_open()) {
         throw std::runtime_error("Error opening file: " + filename);
     }
-    
+
     std::string ip;
     while (std::getline(file, ip)) {
         if (!ip.empty()) {
@@ -80,7 +80,7 @@ void addIPToFile(const std::string& filename, const std::string& ip) {
     // Read current IPs from the file
     std::set<std::string> currentIPs = getIPsFromFile(filename);
     // Check if the IP is already in the file
-    if (currentIPs.find(ip) == currentIPs.end()) {
+    if (currentIPs.find(ip) == std::string::npos) {
         // Append the IP to the file if it is not already present
         std::ofstream file;
         file.open(filename, std::ios::app);
@@ -142,4 +142,3 @@ int main() {
 
     return 0;
 }
-
