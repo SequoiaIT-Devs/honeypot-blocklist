@@ -50,16 +50,16 @@ void generateSSHKeyPair(const std::string& sshKeyPath, const std::string& sshPub
     log(pubkey);
 }
 
-// Function to set up GitHub repository and SSH configuration using temporary keys
+// Function to set up GitHub repository and SSH configuration
 void setupGitHub() {
     const std::string repoPath = "/root/honeypot-blocklist";
-    const std::string tempDir = "/tmp/honeypot-ssh";
-    const std::string sshKeyPath = tempDir + "/id_rsa_probe";
+    const std::string sshDir = "/root/.ssh";
+    const std::string sshKeyPath = sshDir + "/id_rsa_probe";
     const std::string sshPublicKeyPath = sshKeyPath + ".pub";
-    const std::string sshConfigPath = tempDir + "/config";
+    const std::string sshConfigPath = sshDir + "/config";
 
-    // Create temporary directory
-    fs::create_directories(tempDir);
+    // Create SSH directory if it doesn't exist
+    fs::create_directories(sshDir);
 
     // Generate SSH key pair if it doesn't exist
     if (!fs::exists(sshKeyPath) || !fs::exists(sshPublicKeyPath)) {
@@ -68,15 +68,17 @@ void setupGitHub() {
         exit(0);
     }
 
-    // Set up SSH config
-    std::ofstream sshConfigFile(sshConfigPath);
-    if (!sshConfigFile.is_open()) {
-        throw std::runtime_error("Error opening SSH config file: " + sshConfigPath);
+    // Set up SSH config if it doesn't exist
+    if (!fs::exists(sshConfigPath)) {
+        std::ofstream sshConfigFile(sshConfigPath, std::ios::app);
+        if (!sshConfigFile.is_open()) {
+            throw std::runtime_error("Error opening SSH config file: " + sshConfigPath);
+        }
+        sshConfigFile << "Host github.com\n";
+        sshConfigFile << "  IdentityFile " << sshKeyPath << "\n";
+        sshConfigFile << "  StrictHostKeyChecking no\n";
+        sshConfigFile.close();
     }
-    sshConfigFile << "Host github.com\n";
-    sshConfigFile << "  IdentityFile " << sshKeyPath << "\n";
-    sshConfigFile << "  StrictHostKeyChecking no\n";
-    sshConfigFile.close();
 
     // Set GIT_SSH_COMMAND to use the custom SSH config
     std::string gitSshCommand = "GIT_SSH_COMMAND='ssh -F " + sshConfigPath + "'";
@@ -96,9 +98,6 @@ void setupGitHub() {
     // Configure Git user settings
     std::string gitConfigCommand = "cd " + repoPath + " && git config --local user.name \"Sequoia Heights MS\" && git config --local user.email \"robert.romero@sequoiaheightsms.com\"";
     exec(gitConfigCommand.c_str());
-
-    // Clean up temporary files
-    fs::remove_all(tempDir);
 }
 
 // Function to set up Fail2ban configuration
@@ -138,8 +137,7 @@ void addIPToBlocklist(const std::string& blocklistFile, const std::string& ip) {
     file << ip << std::endl;
     file.close();
 
-    const std::string tempDir = "/tmp/honeypot-ssh";
-    const std::string sshConfigPath = tempDir + "/config";
+    const std::string sshConfigPath = "/root/.ssh/config";
     std::string gitSshCommand = "GIT_SSH_COMMAND='ssh -F " + sshConfigPath + "'";
 
     std::string command = gitSshCommand + " cd /root/honeypot-blocklist && git add \"" + blocklistFile + "\" && git commit -m \"Add " + ip + " to blocklist\" && git push origin main";
