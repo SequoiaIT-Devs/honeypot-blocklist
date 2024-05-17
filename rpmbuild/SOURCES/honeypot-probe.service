@@ -1,0 +1,10 @@
+[Unit]
+Description=Fetch and Upload Blocked IPs to GitHub
+After=network.target
+
+[Service]
+ExecStart=/usr/local/bin/honeypot-probe
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

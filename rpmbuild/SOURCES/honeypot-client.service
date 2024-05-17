@@ -1,0 +1,10 @@
+[Unit]
+Description=Sync Blocked IPs from GitHub and Apply to Firewalld
+After=network.target
+
+[Service]
+ExecStart=/usr/local/bin/honeypot-client
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

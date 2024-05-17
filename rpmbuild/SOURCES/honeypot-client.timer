@@ -1,0 +1,10 @@
+[Unit]
+Description=Run sync_blocklist service periodically
+
+[Timer]
+OnBootSec=15min
+OnUnitActiveSec=2h
+Persistent=true
+
+[Install]
+WantedBy=timers.target
