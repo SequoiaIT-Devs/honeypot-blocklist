@@ -26,6 +26,7 @@ Ensure you have the following dependencies installed:
 - `gcc`
 - `systemd`
 - `fail2ban` (for the probe)
+- `firewalld` (for the client)
 - `logrotate`
 
 ### Installing from RPMs (x86_64)
@@ -56,9 +57,11 @@ git clone https://github.com/sequoiaheightsms/honeypot-blocklist.git
 
 ### Honeypot Blocklist Probe
 
-The probe will generate an SSH key pair (if it doesn't already exist) for secure communication with GitHub. The key will be labeled as `id_rsa_probe`. If the key exists, it will not generate a new one.
+The probe syncs fail2ban and applies new IPs to Unauthorized Access Blocklist in GitHub.
 
-After installation, configure Fail2ban by editing but probe defaults are following `/etc/fail2ban/jail.local`:
+A helper script will help generate an SSH key pair (if it doesn't already exist) for secure communication with GitHub. The key will be labeled as `id_rsa_probe`. If the key exists, it will not generate a new one.
+
+also it will configure Fail2ban by creating `/etc/fail2ban/jail.local`:
 
 ```ini
 [sshd]
@@ -67,7 +70,7 @@ port     = ssh
 logpath  = %(sshd_log)s
 backend  = %(sshd_backend)s
 maxretry = 2
-bantime  = 2h
+bantime  = 6h
 ```
 
 ### Honeypot Blocklist Client
