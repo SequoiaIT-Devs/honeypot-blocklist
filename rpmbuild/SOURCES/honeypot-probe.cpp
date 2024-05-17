@@ -38,8 +38,29 @@ int execWithResult(const std::string& cmd) {
     return result;
 }
 
+// Function to check if an IP already exists in the blocklist file
+bool ipExistsInBlocklist(const std::string& blocklistFile, const std::string& ip) {
+    std::ifstream file(blocklistFile);
+    if (!file.is_open()) {
+        throw std::runtime_error("Error opening file for reading: " + blocklistFile);
+    }
+
+    std::string line;
+    while (std::getline(file, line)) {
+        if (line == ip) {
+            return true; // IP already exists in the blocklist
+        }
+    }
+    return false;
+}
+
 // Function to add an IP to the local blocklist file and commit to GitHub
 void addIPToBlocklist(const std::string& blocklistFile, const std::string& ip) {
+    if (ipExistsInBlocklist(blocklistFile, ip)) {
+        std::cout << "IP " << ip << " already exists in blocklist. Skipping." << std::endl;
+        return;
+    }
+
     std::ofstream file(blocklistFile, std::ios::app);
     if (!file.is_open()) {
         throw std::runtime_error("Error opening file for writing: " + blocklistFile);
