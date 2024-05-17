@@ -1,6 +1,6 @@
 Name:           honeypot-blocklist
 Version:        1.3
-Release:        1%{?dist}
+Release:        2%{?dist}
 Summary:        Honeypot Blocklist Service
 
 License:        MIT License
@@ -103,6 +103,8 @@ systemctl daemon-reload
 /etc/logrotate.d/honeypot-client
 
 %changelog
+* Thu May 16 2024 Sequoia Heights MS <info@sequoiaheightsms.com> - 1.3-2
+- Bug Fix: Explicitly check if the IP already exists in the blocklist file before adding it
 * Thu May 16 2024 Sequoia Heights MS <info@sequoiaheightsms.com> - 1.3-1
 - Split into probe and client packages
 - Probe: collects IPs from fail2ban and uploads to GitHub
