@@ -57,11 +57,17 @@ git clone https://github.com/sequoiaheightsms/honeypot-blocklist.git
 
 ### Honeypot Blocklist Probe
 
-The probe syncs fail2ban and applies new IPs to Unauthorized Access Blocklist in GitHub.
+The probe syncs fail2ban and applies new IPs to the Unauthorized Access Blocklist in GitHub.
 
-A helper script will help generate an SSH key pair (if it doesn't already exist) for secure communication with GitHub. The key will be labeled as `id_rsa_probe`. If the key exists, it will not generate a new one.
+A helper script called setup.sh 
 
-also it will configure Fail2ban by creating `/etc/fail2ban/jail.local`:
+```bash
+./setup.sh --probe
+```
+
+it will help generate an SSH key pair (if it doesn't already exist) for secure communication with GitHub. The key will be labeled as `id_rsa_probe`. If the key exists, it will not generate a new one.
+
+also it will install and configure Fail2ban by creating `/etc/fail2ban/jail.local`:
 
 ```ini
 [sshd]
@@ -72,10 +78,15 @@ backend  = %(sshd_backend)s
 maxretry = 2
 bantime  = 6h
 ```
+and perform the installation of the RPMs and start and enable the services.
 
 ### Honeypot Blocklist Client
 
-The client syncs the blocklist from GitHub and applies the IPs to Firewalld.
+The client syncs the blocklist from GitHub and applies the IPs to Firewalld. The helper script can be used for installation and setup.
+
+```bash
+./setup.sh --client
+```
 
 ## Logging
 
@@ -100,7 +111,7 @@ We welcome contributions from the community. Here’s how you can contribute wit
    git clone https://github.com/yourusername/honeypot-blocklist.git
    ```
 
-3. **Create a Branch**: Create a new branch for your feature or bugfix.
+3. **Create a Branch**: Create a new branch for your feature or bug fix.
 
    ```bash
    git checkout -b feature-name
