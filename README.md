@@ -1,3 +1,5 @@
+![Honeypot Blocklist Logo](https://github.com/sequoiaheightsms/honeypot-blocklist/blob/main/honeypot-logo.png)
+
 # Honeypot Blocklists from Sequoia Heights MS
 
 ## Overview
