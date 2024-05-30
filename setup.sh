@@ -74,10 +74,6 @@ setup_probe() {
     read -p "Enter your Git email: " git_email
     read -p "Enter your GitHub username: " github_username
 
-    # Configure Git
-    git config --global user.name "$git_name"
-    git config --global user.email "$git_email"
-
     # Check and install Fail2Ban if not installed
     if ! command -v fail2ban-server &> /dev/null; then
         echo "Fail2Ban is not installed. Installing..."
@@ -130,6 +126,10 @@ EOL
     # Set git remote URL to user's fork
     echo "Configuring git remote URL..."
     git remote set-url origin git@github.com-honeypot-probe:$github_username/honeypot-blocklist.git
+    
+    # Configure Git
+    git config user.name "$git_name"
+    git config user.email "$git_email"
 
     # Check if the RPM file exists
     local rpm_file="./RPMS/x86_64/honeypot-blocklist-probe-${rpm_version}.${os_version}.x86_64.rpm"
