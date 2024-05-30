@@ -2,7 +2,7 @@
 
 ## Overview
 
-This repository provides free blocklists compiled from our honeypot network. It contains IP addresses that have attempted unauthorized access, serving as a valuable resource for enhancing network security.
+This repository offers an integrated solution featuring a probe and client. Our blocklists, sourced from our honeypot network, are freely available. We provide a sync client for up-to-date protection and a probe tool for contributing new data. The blocklist contains IP addresses that have attempted unauthorized access on a honeypot probe, serving as a valuable resource for enhancing network security.
 
 ## Features
 
