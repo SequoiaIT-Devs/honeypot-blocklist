@@ -69,6 +69,18 @@ void addIPToFile(const std::string& blocklistFile, const std::string& ip) {
     }
 }
 
+// Function to determine if firewalld is active
+bool isFirewalldActive() {
+    std::string output = exec("systemctl is-active firewalld");
+    return (output.find("active") != std::string::npos);
+}
+
+// Function to determine if ufw is active
+bool isUfwActive() {
+    std::string output = exec("ufw status");
+    return (output.find("Status: active") != std::string::npos);
+}
+
 // Function to sync and apply the blocklist
 void syncBlocklist() {
     const std::string repoPath = "/root/honeypot-blocklist";
@@ -87,21 +99,38 @@ void syncBlocklist() {
         throw std::runtime_error("Error opening blocklist file: " + blocklistFile);
     }
 
-    // Apply IPs to firewalld
+    // Determine which firewall is active and apply IPs accordingly
+    bool firewalldActive = isFirewalldActive();
+    bool ufwActive = isUfwActive();
+
+    if (!firewalldActive && !ufwActive) {
+        throw std::runtime_error("Neither firewalld nor ufw is active.");
+    }
+
     std::string line;
     while (std::getline(inputFile, line)) {
         std::string ip = trim(line);
         if (!ip.empty()) {
-            std::string firewallCommand = "firewall-cmd --permanent --add-rich-rule='rule family=\"ipv4\" source address=\"" + ip + "\" reject'";
-            exec(firewallCommand.c_str());
-            log("IP " + ip + " added to firewalld.");
+            if (firewalldActive) {
+                std::string firewallCommand = "firewall-cmd --permanent --add-rich-rule='rule family=\"ipv4\" source address=\"" + ip + "\" reject'";
+                exec(firewallCommand.c_str());
+                log("IP " + ip + " added to firewalld.");
+            } else if (ufwActive) {
+                std::string ufwCommand = "ufw deny from " + ip;
+                exec(ufwCommand.c_str());
+                log("IP " + ip + " added to ufw.");
+            }
         }
     }
     inputFile.close();
 
-    // Reload firewalld
-    exec("firewall-cmd --reload");
-    log("Firewalld reloaded.");
+    if (firewalldActive) {
+        exec("firewall-cmd --reload");
+        log("Firewalld reloaded.");
+    } else if (ufwActive) {
+        exec("ufw reload");
+        log("Ufw reloaded.");
+    }
 }
 
 int main() {
