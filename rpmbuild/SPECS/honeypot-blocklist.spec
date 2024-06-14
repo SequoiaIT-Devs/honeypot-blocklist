@@ -14,7 +14,7 @@ Source5:        honeypot-client.timer
 Source6:        honeypot-probe.logrotate
 Source7:        honeypot-client.logrotate
 
-BuildRequires:  gcc sqlite-devel sqlite
+BuildRequires:  gcc sqlite-devel
 Requires:       systemd
 
 %description
@@ -38,8 +38,8 @@ cp %{SOURCE0} .
 cp %{SOURCE1} .
 
 %build
-g++ -g -o honeypot-probe honeypot-probe.cpp
-g++ -g -o honeypot-client honeypot-client.cpp
+g++ -g -o honeypot-probe honeypot-probe.cpp -lsqlite3
+g++ -g -o honeypot-client honeypot-client.cpp -lsqlite3
 
 %install
 # Install files for the probe package
@@ -104,10 +104,10 @@ systemctl daemon-reload
 /etc/logrotate.d/honeypot-client
 
 %changelog
-* Thu June 14 2024 Sequoia Heights MS <info@sequoiaheightsms.com> - 1.4-1
-- Switched from single file storage to SQLite database for IP blocklist.
-- Added database initialization and migration functions.
-- Added table to track applied IPs to avoid reapplying them.
+* Fri Jun 14 2024 Sequoia Heights MS <info@sequoiaheightsms.com> - 1.4-1
+- Switched from single file storage to SQLite database for IP blocklist
+- Added database initialization and migration functions
+- Added table to track applied IPs to avoid reapplying them
 * Thu May 16 2024 Sequoia Heights MS <info@sequoiaheightsms.com> - 1.3-2
 - Bug Fix: Explicitly check if the IP already exists in the blocklist file before adding it
 * Thu May 16 2024 Sequoia Heights MS <info@sequoiaheightsms.com> - 1.3-1
