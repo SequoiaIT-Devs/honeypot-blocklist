@@ -1,11 +1,20 @@
 #!/bin/bash
-# 
-# Specify the file containing the IP addresses
-file="Unauthorized Access Blocklist"
 
-# Check if the file exists
-if [ ! -f "$file" ]; then
-    echo "Error: File $file not found!"
+# Specify the SQLite database file
+db_file="/root/honeypot-blocklist/blocklist.db"
+
+# Check if the database file exists
+if [ ! -f "$db_file" ]; then
+    echo "Error: Database file $db_file not found!"
+    exit 1
+fi
+
+# Use sqlite3 to fetch the IP addresses from the Blocklist table
+ip_list=$(sqlite3 "$db_file" "SELECT ip FROM Blocklist;")
+
+# Check if the query was successful
+if [ $? -ne 0 ]; then
+    echo "Error: Failed to query the database!"
     exit 1
 fi
 
@@ -15,8 +24,8 @@ duplicate_count=0
 
 echo "Duplicate IP addresses found:"
 
-while read -r line; do
-    ip=$(echo "$line" | awk '{print $1}')
+# Read IPs from the query result
+while IFS= read -r ip; do
     if [[ -n "$ip" ]]; then
         if [[ -n "${ip_map[$ip]}" ]]; then
             echo "$ip"
@@ -25,8 +34,9 @@ while read -r line; do
             ip_map["$ip"]=1
         fi
     fi
-done < "$file"
+done <<< "$ip_list"
 
 if [[ $duplicate_count -eq 0 ]]; then
     echo "No duplicates found."
 fi
+
