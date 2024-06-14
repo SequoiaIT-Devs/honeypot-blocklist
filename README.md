@@ -72,7 +72,7 @@ git clone https://github.com/sequoiaheightsms/honeypot-blocklist.git
 
 ### Honeypot Probe
 
-The probe syncs fail2ban and applies new IPs to an SQLite BD in GitHub.
+The probe syncs fail2ban and applies new IPs to an SQLite DB in GitHub.
 
 A helper script called setup.sh 
 
