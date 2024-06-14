@@ -8,6 +8,7 @@
 #include <stdexcept>
 #include <sstream>
 #include <filesystem>
+#include <sqlite3.h>
 
 namespace fs = std::filesystem;
 
@@ -44,35 +45,85 @@ std::string trim(const std::string& str) {
     return (start == std::string::npos) ? "" : str.substr(start, end - start + 1);
 }
 
-// Function to add an IP to the local blocklist file and commit to GitHub
-void addIPToFile(const std::string& blocklistFile, const std::string& ip) {
-    // Read current IPs from blocklist
-    std::ifstream inputFile(blocklistFile);
-    std::set<std::string> currentIPs;
-    std::string line;
-    while (std::getline(inputFile, line)) {
-        currentIPs.insert(trim(line));
+// Function to initialize the SQLite database
+void initializeDatabase(sqlite3* db) {
+    const char* createTableSQL = 
+        "CREATE TABLE IF NOT EXISTS Blocklist ("
+        "id INTEGER PRIMARY KEY AUTOINCREMENT,"
+        "ip TEXT NOT NULL UNIQUE);";
+    
+    const char* createAppliedTableSQL = 
+        "CREATE TABLE IF NOT EXISTS AppliedBlocklist ("
+        "id INTEGER PRIMARY KEY AUTOINCREMENT,"
+        "ip TEXT NOT NULL UNIQUE);";
+    
+    char* errMsg = nullptr;
+    int rc = sqlite3_exec(db, createTableSQL, nullptr, nullptr, &errMsg);
+    if (rc != SQLITE_OK) {
+        std::string error = "SQL error: ";
+        error += errMsg;
+        sqlite3_free(errMsg);
+        throw std::runtime_error(error);
     }
-    inputFile.close();
+    rc = sqlite3_exec(db, createAppliedTableSQL, nullptr, nullptr, &errMsg);
+    if (rc != SQLITE_OK) {
+        std::string error = "SQL error: ";
+        error += errMsg;
+        sqlite3_free(errMsg);
+        throw std::runtime_error(error);
+    }
+}
 
-    // Check if the IP is already in the set
-    if (currentIPs.find(ip) == currentIPs.end()) {
-        std::ofstream outputFile(blocklistFile, std::ios::app);
-        if (!outputFile.is_open()) {
-            throw std::runtime_error("Error opening file for writing: " + blocklistFile);
-        }
-        outputFile << ip << std::endl;
-        outputFile.close();
-        log("IP " + ip + " added to blocklist.");
-    } else {
-        log("IP " + ip + " is already in the blocklist.");
+// Function to check if an IP already exists in the AppliedBlocklist table
+bool ipExistsInAppliedBlocklist(sqlite3* db, const std::string& ip) {
+    const char* selectSQL = "SELECT 1 FROM AppliedBlocklist WHERE ip = ?;";
+    sqlite3_stmt* stmt = nullptr;
+    int rc = sqlite3_prepare_v2(db, selectSQL, -1, &stmt, nullptr);
+    if (rc != SQLITE_OK) {
+        throw std::runtime_error("Failed to prepare statement");
     }
+
+    sqlite3_bind_text(stmt, 1, ip.c_str(), -1, SQLITE_STATIC);
+    rc = sqlite3_step(stmt);
+    bool exists = (rc == SQLITE_ROW);
+    sqlite3_finalize(stmt);
+    return exists;
+}
+
+// Function to add an IP to the AppliedBlocklist table
+void addIPToAppliedBlocklist(sqlite3* db, const std::string& ip) {
+    const char* insertSQL = "INSERT INTO AppliedBlocklist (ip) VALUES (?);";
+    sqlite3_stmt* stmt = nullptr;
+    int rc = sqlite3_prepare_v2(db, insertSQL, -1, &stmt, nullptr);
+    if (rc != SQLITE_OK) {
+        throw std::runtime_error("Failed to prepare statement");
+    }
+
+    sqlite3_bind_text(stmt, 1, ip.c_str(), -1, SQLITE_STATIC);
+    rc = sqlite3_step(stmt);
+    sqlite3_finalize(stmt);
+
+    if (rc != SQLITE_DONE) {
+        throw std::runtime_error("Failed to insert IP into AppliedBlocklist");
+    }
+}
+
+// Function to determine if firewalld is active
+bool isFirewalldActive() {
+    std::string output = exec("systemctl is-active firewalld");
+    return (output.find("active") != std::string::npos);
+}
+
+// Function to determine if ufw is active
+bool isUfwActive() {
+    std::string output = exec("ufw status");
+    return (output.find("Status: active") != std::string::npos);
 }
 
 // Function to sync and apply the blocklist
 void syncBlocklist() {
     const std::string repoPath = "/root/honeypot-blocklist";
-    const std::string blocklistFile = repoPath + "/Unauthorized Access Blocklist";
+    const std::string dbPath = repoPath + "/blocklist.db";
 
     // Sync the GitHub repository
     std::string command = "cd " + repoPath + " && git pull origin main";
@@ -81,27 +132,54 @@ void syncBlocklist() {
     }
     log("GitHub repository synced successfully.");
 
-    // Read the blocklist file
-    std::ifstream inputFile(blocklistFile);
-    if (!inputFile.is_open()) {
-        throw std::runtime_error("Error opening blocklist file: " + blocklistFile);
+    // Open the SQLite database
+    sqlite3* db = nullptr;
+    int rc = sqlite3_open(dbPath.c_str(), &db);
+    if (rc) {
+        throw std::runtime_error("Can't open database: " + std::string(sqlite3_errmsg(db)));
+    }
+    initializeDatabase(db);
+
+    // Determine which firewall is active and apply IPs accordingly
+    bool firewalldActive = isFirewalldActive();
+    bool ufwActive = isUfwActive();
+
+    if (!firewalldActive && !ufwActive) {
+        throw std::runtime_error("Neither firewalld nor ufw is active.");
     }
 
-    // Apply IPs to firewalld
-    std::string line;
-    while (std::getline(inputFile, line)) {
-        std::string ip = trim(line);
-        if (!ip.empty()) {
-            std::string firewallCommand = "firewall-cmd --permanent --add-rich-rule='rule family=\"ipv4\" source address=\"" + ip + "\" reject'";
-            exec(firewallCommand.c_str());
-            log("IP " + ip + " added to firewalld.");
+    const char* selectSQL = "SELECT ip FROM Blocklist;";
+    sqlite3_stmt* stmt = nullptr;
+    rc = sqlite3_prepare_v2(db, selectSQL, -1, &stmt, nullptr);
+    if (rc != SQLITE_OK) {
+        throw std::runtime_error("Failed to prepare statement");
+    }
+
+    while (sqlite3_step(stmt) == SQLITE_ROW) {
+        std::string ip = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 0));
+        if (!ip.empty() && !ipExistsInAppliedBlocklist(db, ip)) {
+            if (firewalldActive) {
+                std::string firewallCommand = "firewall-cmd --permanent --add-rich-rule='rule family=\"ipv4\" source address=\"" + ip + "\" reject'";
+                exec(firewallCommand.c_str());
+                log("IP " + ip + " added to firewalld.");
+            } else if (ufwActive) {
+                std::string ufwCommand = "ufw deny from " + ip;
+                exec(ufwCommand.c_str());
+                log("IP " + ip + " added to ufw.");
+            }
+            addIPToAppliedBlocklist(db, ip);
         }
     }
-    inputFile.close();
+    sqlite3_finalize(stmt);
+    sqlite3_close(db);
 
-    // Reload firewalld
-    exec("firewall-cmd --reload");
-    log("Firewalld reloaded.");
+    if (firewalldActive) {
+        exec("firewall-cmd --reload");
+        log("Firewalld reloaded.");
+    } else if (ufwActive) {
+        exec("ufw reload");
+        log("Ufw reloaded.");
+    }
 }
 
 int main() {

@@ -10,6 +10,7 @@
 #include <ctime>
 #include <unistd.h>
 #include <filesystem>
+#include <sqlite3.h>
 
 // Function to execute a shell command and return the output
 std::string exec(const char* cmd) {
@@ -38,42 +39,6 @@ int execWithResult(const std::string& cmd) {
     return result;
 }
 
-// Function to check if an IP already exists in the blocklist file
-bool ipExistsInBlocklist(const std::string& blocklistFile, const std::string& ip) {
-    std::ifstream file(blocklistFile);
-    if (!file.is_open()) {
-        throw std::runtime_error("Error opening file for reading: " + blocklistFile);
-    }
-
-    std::string line;
-    while (std::getline(file, line)) {
-        if (line == ip) {
-            return true; // IP already exists in the blocklist
-        }
-    }
-    return false;
-}
-
-// Function to add an IP to the local blocklist file and commit to GitHub
-void addIPToBlocklist(const std::string& blocklistFile, const std::string& ip) {
-    if (ipExistsInBlocklist(blocklistFile, ip)) {
-        std::cout << "IP " << ip << " already exists in blocklist. Skipping." << std::endl;
-        return;
-    }
-
-    std::ofstream file(blocklistFile, std::ios::app);
-    if (!file.is_open()) {
-        throw std::runtime_error("Error opening file for writing: " + blocklistFile);
-    }
-    file << ip << std::endl;
-    file.close();
-
-    std::string command = "git add \"" + blocklistFile + "\" && git commit -m \"Add " + ip + " to blocklist\"";
-    if (execWithResult(command) != 0) {
-        throw std::runtime_error("Error committing IP to Git repository: " + ip);
-    }
-}
-
 // Function to log messages with timestamps
 void logMessage(const std::string& message) {
     std::ofstream logFile("/var/log/honeypot-probe.log", std::ios::app);
@@ -96,10 +61,91 @@ std::string trim(const std::string& str) {
     return (start == std::string::npos) ? "" : str.substr(start, end - start + 1);
 }
 
-int main() {
+// Function to initialize the SQLite database
+void initializeDatabase(sqlite3* db) {
+    const char* createTableSQL = 
+        "CREATE TABLE IF NOT EXISTS Blocklist ("
+        "id INTEGER PRIMARY KEY AUTOINCREMENT,"
+        "ip TEXT NOT NULL UNIQUE);";
+    
+    char* errMsg = nullptr;
+    int rc = sqlite3_exec(db, createTableSQL, nullptr, nullptr, &errMsg);
+    if (rc != SQLITE_OK) {
+        std::string error = "SQL error: ";
+        error += errMsg;
+        sqlite3_free(errMsg);
+        throw std::runtime_error(error);
+    }
+}
+
+// Function to check if an IP already exists in the database
+bool ipExistsInDatabase(sqlite3* db, const std::string& ip) {
+    const char* selectSQL = "SELECT 1 FROM Blocklist WHERE ip = ?;";
+    sqlite3_stmt* stmt = nullptr;
+    int rc = sqlite3_prepare_v2(db, selectSQL, -1, &stmt, nullptr);
+    if (rc != SQLITE_OK) {
+        throw std::runtime_error("Failed to prepare statement");
+    }
+
+    sqlite3_bind_text(stmt, 1, ip.c_str(), -1, SQLITE_STATIC);
+    rc = sqlite3_step(stmt);
+    bool exists = (rc == SQLITE_ROW);
+    sqlite3_finalize(stmt);
+    return exists;
+}
+
+// Function to add an IP to the database and commit to GitHub
+void addIPToDatabase(sqlite3* db, const std::string& ip) {
+    if (ipExistsInDatabase(db, ip)) {
+        std::cout << "IP " << ip << " already exists in blocklist. Skipping." << std::endl;
+        return;
+    }
+
+    const char* insertSQL = "INSERT INTO Blocklist (ip) VALUES (?);";
+    sqlite3_stmt* stmt = nullptr;
+    int rc = sqlite3_prepare_v2(db, insertSQL, -1, &stmt, nullptr);
+    if (rc != SQLITE_OK) {
+        throw std::runtime_error("Failed to prepare statement");
+    }
+
+    sqlite3_bind_text(stmt, 1, ip.c_str(), -1, SQLITE_STATIC);
+    rc = sqlite3_step(stmt);
+    sqlite3_finalize(stmt);
+
+    if (rc != SQLITE_DONE) {
+        throw std::runtime_error("Failed to insert IP into database");
+    }
+
+    std::string command = "git add \"blocklist.db\" && git commit -m \"Add " + ip + " to blocklist\"";
+    if (execWithResult(command) != 0) {
+        throw std::runtime_error("Error committing IP to Git repository: " + ip);
+    }
+}
+
+// Function to upgrade from single file to database
+void upgradeBlocklistToDatabase(const std::string& blocklistFile, sqlite3* db) {
+    std::ifstream file(blocklistFile);
+    if (!file.is_open()) {
+        throw std::runtime_error("Error opening file for reading: " + blocklistFile);
+    }
+
+    std::string line;
+    while (std::getline(file, line)) {
+        line = trim(line);
+        if (!line.empty()) {
+            addIPToDatabase(db, line);
+        }
+    }
+
+    // Optionally remove the old blocklist file after upgrade
+    std::filesystem::remove(blocklistFile);
+}
+
+int main(int argc, char* argv[]) {
     try {
         const std::string repoPath = "/root/honeypot-blocklist";
         const std::string blocklistFile = repoPath + "/Unauthorized Access Blocklist";
+        const std::string dbPath = repoPath + "/blocklist.db";
 
         // Ensure the repository path exists
         if (!std::filesystem::exists(repoPath)) {
@@ -117,6 +163,23 @@ int main() {
         std::string pullCommand = "cd " + repoPath + " && git reset --hard && git pull --rebase origin main";
         if (execWithResult(pullCommand) != 0) {
             throw std::runtime_error("Error pulling from Git repository");
+        }
+
+        // Open the SQLite database
+        sqlite3* db = nullptr;
+        int rc = sqlite3_open(dbPath.c_str(), &db);
+        if (rc) {
+            throw std::runtime_error("Can't open database: " + std::string(sqlite3_errmsg(db)));
+        }
+        initializeDatabase(db);
+
+        // Check if the --upgrade flag is provided
+        if (argc > 1 && std::strcmp(argv[1], "--upgrade") == 0) {
+            logMessage("Upgrading blocklist to database");
+            upgradeBlocklistToDatabase(blocklistFile, db);
+            logMessage("Blocklist upgraded to database successfully");
+            sqlite3_close(db);
+            return 0;
         }
 
         std::string jail = "sshd";
@@ -148,7 +211,7 @@ int main() {
         for (const auto& ip : ip_set) {
             logMessage("Processing IP: " + ip);
             std::cout << "Adding IP to blocklist: " << ip << std::endl;
-            addIPToBlocklist(blocklistFile, ip);
+            addIPToDatabase(db, ip);
             updated = true;
         }
 
@@ -162,6 +225,7 @@ int main() {
         }
 
         logMessage("All banned IPs from " + jail + " have been added to the blocklist.");
+        sqlite3_close(db);
 
     } catch (const std::exception& e) {
         std::cerr << "Error: " << e.what() << std::endl;

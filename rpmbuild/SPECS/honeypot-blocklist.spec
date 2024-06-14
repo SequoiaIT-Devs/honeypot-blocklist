@@ -1,6 +1,6 @@
 Name:           honeypot-blocklist
-Version:        1.3
-Release:        2%{?dist}
+Version:        1.4
+Release:        1%{?dist}
 Summary:        Honeypot Blocklist Service
 
 License:        MIT License
@@ -14,23 +14,23 @@ Source5:        honeypot-client.timer
 Source6:        honeypot-probe.logrotate
 Source7:        honeypot-client.logrotate
 
-BuildRequires:  gcc
+BuildRequires:  gcc sqlite-devel
 Requires:       systemd
 
 %description
-Honeypot Blocklist Service to block and sync IPs using firewalld and fail2ban.
+Honeypot Blocklist Service to block and sync IPs using firewalld/ufw and fail2ban.
 
 %package probe
 Summary:        Honeypot Blocklist Probe
 Requires:       systemd fail2ban logrotate
 %description probe
-Honeypot Blocklist Probe to collect IPs from fail2ban and upload them to GitHub.
+Honeypot Blocklist Probe will collect IPs from fail2ban and upload them to GitHub.
 
 %package client
 Summary:        Honeypot Blocklist Client
 Requires:       systemd logrotate
 %description client
-Honeypot Blocklist Client to sync IPs from GitHub and apply them to firewalld.
+Honeypot Blocklist Client will sync IPs from GitHub and apply them to firewalld or ufw.
 
 %prep
 %setup -c -T
@@ -38,8 +38,8 @@ cp %{SOURCE0} .
 cp %{SOURCE1} .
 
 %build
-g++ -g -o honeypot-probe honeypot-probe.cpp
-g++ -g -o honeypot-client honeypot-client.cpp
+g++ -g -o honeypot-probe honeypot-probe.cpp -lsqlite3
+g++ -g -o honeypot-client honeypot-client.cpp -lsqlite3
 
 %install
 # Install files for the probe package
@@ -76,7 +76,8 @@ systemctl daemon-reload
 systemctl daemon-reload
 systemctl enable honeypot-client.timer
 systemctl start honeypot-client.timer
-
+# Initialize the SQLite database
+/usr/bin/sqlite3 /root/honeypot-blocklist/blocklist.db "DROP TABLE IF EXISTS AppliedBlocklist;"
 %preun client
 if [ $1 -eq 0 ]; then
     if systemctl is-active --quiet honeypot-client.timer; then
@@ -103,6 +104,10 @@ systemctl daemon-reload
 /etc/logrotate.d/honeypot-client
 
 %changelog
+* Fri Jun 14 2024 Sequoia Heights MS <info@sequoiaheightsms.com> - 1.4-1
+- Switched from single file storage to SQLite database for IP blocklist
+- Added database initialization and migration functions
+- Added table to track applied IPs to avoid reapplying them
 * Thu May 16 2024 Sequoia Heights MS <info@sequoiaheightsms.com> - 1.3-2
 - Bug Fix: Explicitly check if the IP already exists in the blocklist file before adding it
 * Thu May 16 2024 Sequoia Heights MS <info@sequoiaheightsms.com> - 1.3-1
