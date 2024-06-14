@@ -27,8 +27,9 @@ Ensure you have the following dependencies installed:
 
 - `gcc`
 - `systemd`
+- `sqlite-devel`
 - `fail2ban` (for the probe)
-- `firewalld` (for the client)
+- `firewalld` or `ufw` (for the client)
 - `logrotate`
 
 ### Installing from RPMs (x86_64)
@@ -41,13 +42,24 @@ Ensure you have the following dependencies installed:
 
    ```bash
    sudo yum install honeypot-blocklist-probe-<version>.el9.x86_64.rpm
+   or
+   sudo yum install honeypot-blocklist-probe-<version>.el8.x86_64.rpm
    ```
 
 3. **Install the Client**
 
    ```bash
    sudo yum install honeypot-blocklist-client-<version>.el9.x86_64.rpm
+   or
+   sudo yum install honeypot-blocklist-client-<version>.el8.x86_64.rpm
    ```
+### Upgrading from 1.3-x to 1.4-x
+
+```bash
+/usr/local/bin/honeypot-probe --upgrade
+systemctl start honeypot-probe
+systemctl start honeypot-client
+```
 
 ### Cloning the Repository
 
