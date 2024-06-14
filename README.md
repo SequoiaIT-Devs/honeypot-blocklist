@@ -56,7 +56,8 @@ Ensure you have the following dependencies installed:
 ### Upgrading from 1.3-x to 1.4-x
 
 ```bash
-/usr/local/bin/honeypot-probe --upgrade
+/usr/local/bin/honeypot-probe --upgrade,
+optional:
 systemctl start honeypot-probe
 systemctl start honeypot-client
 ```
