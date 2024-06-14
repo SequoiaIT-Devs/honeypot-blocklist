@@ -1,6 +1,6 @@
 ![Honeypot Blocklist Logo](https://github.com/sequoiaheightsms/honeypot-blocklist/blob/main/honeypot-logo.png)
 
-# Honeypot Blocklists from Sequoia Heights MS
+# Honeypot from Sequoia Heights MS
 
 ## Overview
 
@@ -16,8 +16,8 @@ This repository offers an integrated solution featuring a probe and client. Our 
 
 This repository offers two separate products:
 
-1. **Honeypot Blocklist Probe**: Collects IPs from Fail2ban and uploads them to GitHub.
-2. **Honeypot Blocklist Client**: Syncs IPs from GitHub and applies them to Firewalld.
+1. **Honeypot Probe**: Collects IPs from Fail2ban and uploads them to GitHub.
+2. **Honeypot Client**: Syncs IPs from GitHub and applies them to Firewalld or ufw.
 
 ## Installation
 
@@ -69,7 +69,7 @@ git clone https://github.com/sequoiaheightsms/honeypot-blocklist.git
 
 ## Configuration
 
-### Honeypot Blocklist Probe
+### Honeypot Probe
 
 The probe syncs fail2ban and applies new IPs to the Unauthorized Access Blocklist in GitHub.
 
@@ -94,7 +94,7 @@ bantime  = 6h
 ```
 and perform the installation of the RPMs and start and enable the services.
 
-### Honeypot Blocklist Client
+### Honeypot Client
 
 The client syncs the blocklist from GitHub and applies the IPs to Firewalld. The helper script can be used for installation and setup.
 
