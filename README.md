@@ -71,7 +71,7 @@ git clone https://github.com/sequoiaheightsms/honeypot-blocklist.git
 
 ### Honeypot Probe
 
-The probe syncs fail2ban and applies new IPs to the Unauthorized Access Blocklist in GitHub.
+The probe syncs fail2ban and applies new IPs to an SQLite BD in GitHub.
 
 A helper script called setup.sh 
 
@@ -96,7 +96,7 @@ and perform the installation of the RPMs and start and enable the services.
 
 ### Honeypot Client
 
-The client syncs the blocklist from GitHub and applies the IPs to Firewalld. The helper script can be used for installation and setup.
+The client syncs the blocklist from GitHub and applies the IPs to Firewalld/UFW. The helper script can be used for installation and setup.
 
 ```bash
 ./setup.sh --client
