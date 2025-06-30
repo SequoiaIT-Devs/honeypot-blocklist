@@ -153,7 +153,7 @@ This project is licensed under the MIT License. See the [LICENSE](LICENSE) file 
 
 ## Contact
 
-Please contact [Robert Romero](mailto:robert.romero@sequoiaheightsms.com).
+Please contact [Robert Romero](mailto:robert.romero@getsequoiait.com).
 
 ## Acknowledgments
 
