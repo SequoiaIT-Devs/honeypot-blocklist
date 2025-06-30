@@ -36,7 +36,7 @@ Ensure you have the following dependencies installed:
 
 1. **Download the RPM files**
 
-   Download the latest RPMs for the probe and client from the [releases page](https://github.com/sequoiaheightsms/honeypot-blocklist/releases).
+   Download the latest RPMs for the probe and client from the [releases page](https://github.com/SequoiaIT-Devs/honeypot-blocklist/releases).
 
 2. **Install the Probe**
 
